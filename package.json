@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-search-toggle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DSH web 会话搜索开关：在原有会话标题搜索框基础上，一键在标题 ↔ 内容之间切换，依据输入与总结内容关键词定位历史会话。",
   "type": "module",
   "main": "lib/index.mjs",
