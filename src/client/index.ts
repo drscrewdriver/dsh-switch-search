@@ -1,5 +1,5 @@
 /**
- * dsh-switch-search client half: a `sidebar.footer.action` entry that opens a
+ * dsh-session-search-toggle client half: a `sidebar.footer.action` entry that opens a
  * floating search panel over the sidebar. The panel has two modes:
  *
  * - 标题搜索 — lists every session (title + cwd) from the host route and
@@ -95,10 +95,10 @@ const CSS = `
 /** Inject the plugin stylesheet once per activation (removed on disposal). */
 function injectStyles(): () => void {
   if (typeof document === 'undefined') return () => {}
-  if (document.querySelector('style[data-plugin-css="dsw-switch-search/styles"]') !== null) return () => {}
+  if (document.querySelector('style[data-plugin-css="dsw-session-search-toggle/styles"]') !== null) return () => {}
   const tag = document.createElement('style')
-  tag.dataset.plugin = 'dsh-switch-search'
-  tag.dataset.pluginCss = 'dsw-switch-search/styles'
+  tag.dataset.plugin = 'dsh-session-search-toggle'
+  tag.dataset.pluginCss = 'dsw-session-search-toggle/styles'
   tag.textContent = CSS
   document.head.appendChild(tag)
   return () => {
@@ -110,13 +110,13 @@ function injectStyles(): () => void {
 
 const FETCH_TIMEOUT = 10000
 
-/** POST a JSON body to a fenced switch-search API method. */
+/** POST a JSON body to a fenced session-search-toggle API method. */
 function callHost<T>(method: string, body: unknown): Promise<{ ok: boolean; items: T[]; error?: string }> {
   const controller = typeof AbortController === 'undefined' ? undefined : new AbortController()
   const timer = controller !== undefined && typeof setTimeout === 'function'
     ? setTimeout(() => { controller.abort() }, FETCH_TIMEOUT)
     : undefined
-  return fetch(`/switch-search/api/${method}`, {
+  return fetch(`/session-search-toggle/api/${method}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -416,7 +416,7 @@ export const inject = ['slots']
  * @param ctx - client plugin context (slots, sessions).
  */
 export function apply(ctx: Context): void {
-  ctx.effect(() => injectStyles(), 'dsh-switch-search: stylesheet')
+  ctx.effect(() => injectStyles(), 'dsh-session-search-toggle: stylesheet')
   const slots = ctx.get('slots') as SwitchSlotsService | undefined
   if (slots === undefined) return
   const sessions = ctx.get('sessions') as SwitchSessionsService | undefined
@@ -424,7 +424,7 @@ export function apply(ctx: Context): void {
     ? (): void => {}
     : (sessionId: string): void => { sessions.open(sessionId) }
   slots.inject('sidebar.footer.action', () => slots.register(
-    { name: 'sidebar.footer.action', id: 'dsh-switch-search', order: 10 },
+    { name: 'sidebar.footer.action', id: 'dsh-session-search-toggle', order: 10 },
     (props: SwitchFooterProps) => createElement(SwitchFooter, { ...props, open }),
   ))
 }

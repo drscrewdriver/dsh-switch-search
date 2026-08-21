@@ -1,5 +1,5 @@
 <p align="center">
-  <strong>Session content search for the DeepSeek Harness sidebar — one-click toggle between title and content, with user / reply / tool filters</strong>
+  <strong>Session-search toggle: one switch — from your existing session title search, locate past sessions by the keywords you type and by content/summary keywords</strong>
 </p>
 <p align="center">
   <a href="README.md">中文</a> · <strong>English</strong>
@@ -9,85 +9,85 @@
   <img alt="Public" src="https://img.shields.io/badge/status-public-7da1de?style=flat-square">
 </p>
 
-# dsh-switch-search
+# dsh-session-search-toggle
 
-> Sidebar **session-search enhancement** for DSH web: adds a **"Search"** entry at the sidebar footer whose floating panel toggles between **title search ↔ content search**; content mode groups results **by session** (title + snippet) and filters by **user / reply / tool**.
+> **One switch** lets you search historical sessions from the session search box — flip between **Title** and **Content**: filter instantly by session title, or locate past sessions across the corpus by **content / summary keywords** — no more digging to find which session said something.
+>
+> Implementation reuses **DSH's built-in full-text session search**, so the UI change is minimal: a **"Search"** entry at the sidebar footer whose floating panel toggles **title ↔ content** in one click.
 
 A cordis client + host plugin assembled via the `dsh plugin` command and a bundle patch — no dsh source changes, no PR required.
 
 ## What it does
 
-- **Title ↔ content toggle**: two ways to search from one entry — "Title" filters by session title / working-directory substring live; "Content" searches message bodies through DSH's built-in FTS5 full-text index.
-- **Content grouped by session**: each content result is one row (session title + strongest snippet + type tag); clicking opens that session — no per-message flood.
-- **Content-type filter**: filter chips at the top of content mode — **All / User / Reply / Tool**; `Tool` opens `tool/call` and `tool/result` events into the index, so you can search tool call arguments and results directly.
-- **Index availability probe**: the host `search-status` endpoint checks whether the `sessionQuery` full-text index is enabled; when it is not, content mode shows one concrete setup instruction instead of a bare "content search unavailable".
-- **General settings row**: Settings → General gains a **"Session Search"** row — enable toggle + default search mode (title/content), applied on write.
-- **Jump to session**: clicking a result opens that session, landing on the context around the hit.
+- **Title ↔ content, one switch**: one search box — "Title" filters session title / working-directory substring live; "Content" goes through DSH's built-in full-text index to search **content keywords, user questions, AI replies** inside sessions — for "I remember we once talked about X, but not which session".
+- **Minimal UI footprint**: the official sidebar search box is a fixed slot that external plugins cannot replace; this plugin adds a **separate entry at the sidebar footer** (`sidebar.footer.action`) — they coexist without interfering, and the UI change stays minimal.
+- **Content grouped by session**: each content result is one row (session title + strongest snippet + matched-message type tag); clicking opens that session — no per-message flood.
+- **Recognizable hit types**: content results carry **User / Reply** tags, so you can tell at a glance whether the hit is a question or an answer.
+- **Jump to session**: clicking a result opens that session, landing on the context around the hit (via `sessions.open`).
 
 ## UI preview
 
-Entry at the sidebar footer and the floating panel layout:
-
 ```text
-┌─ Sidebar ───────────────────────────────┐
-│ ▸ Session search  （sidebar.footer.action）
-│        ┌─ Search panel (portalled) ──────────┐
-│        │ [Title|Content]  [🔍 Search…]        │
-│        │ [All|User|Reply|Tool] ← type filter │
-│        │ ┌─ Results ─────────────────────┐ │
-│        │ │ 📄 Session title one          │ │
-│        │ │    matching snippet…          │ │
-│        │ │ 📄 Session title two · tool   │ │
-│        │ │    bash -c "xxx"              │ │
-│        │ └──────────────────────────────┘ │
-│        └─────────────────────────────────┘│
-└──────────────────────────────────────────┘
+┌─ Sidebar ──────────────────────────────────┐
+│ ▸ Session search  （sidebar.footer.action） │
+│        ┌─ Search panel (floating) ─────────┐│
+│        │ [Title|Content]  [🔍 Search…]     ││
+│        │ ┌─ Results ───────────────────┐   ││
+│        │ │ 📄 Session title one        │   ││
+│        │ │    matching snippet…        │   ││
+│        │ │ 📄 Session title two · Reply │   ││
+│        │ │    "…(content keyword)…"     │   ││
+│        │ └─────────────────────────────┘   ││
+│        └───────────────────────────────────┘│
+└─────────────────────────────────────────────┘
 ```
 
-## Underlying content search: the DSH FTS5 derived index
+## How content search is enabled
 
-Content mode does not build its own database — it reuses DSH's **SQLite FTS5 derived index** (`session-query-sqlite`):
+Content mode reuses **DSH's official full-text index**, so:
 
-| Table | Description |
-|---|---|
-| `persisted_docs` (FTS5) | Full-text docs of persisted sessions (`text` searchable; `type/session_id/seq/...` as filter columns) |
-| `temp.live_docs` (FTS5) | Full-text docs of the current process's live sessions |
-| `persisted_sessions` / `live_sessions` | Session headers + `revision`/`fingerprint` (incremental rebuild keys) |
-| `search_state` | Generation counter driving pagination-cursor invalidation |
+1. **You must activate session content search first** (off by default). The official DSH bundle ships `session-query-sqlite` with `openAt: never` (no index is built); override it in your profile's `cordis.patch.yml` or an overlay, then restart DSH web:
 
-- **Lazy index**: with `openAt: first-search` the index builds on the first search; each search does an **incremental reconcile** (rebuilds only changed sessions) — the first search on a large corpus is slower, later ones are fast.
-- **Tool content is searchable**: `extraction.ts` explicitly feeds `tool/call` (name + arguments) and `tool/result` (result text) into the index — this is the data basis for the plugin's tool filter.
+   ```yaml
+   - id: session-query-sqlite
+     config:
+       path: ':memory:'               # or a durable absolute path (survives restarts)
+       openAt: first-search           # or startup
+   ```
 
-### ⚠️ Prerequisite: enable the full-text index
+2. If your distribution offers a switch under **General settings → Default search mode**, set the default mode to **Content** and tick **activate content search**; after that content is the default, ready to search out of the box. If it is not enabled, the plugin's content mode shows concrete setup guidance; title mode is unaffected.
 
-**The official DSH bundle ships with the full-text index disabled** (`session-query-sqlite` has `openAt: never`; see `deepseek-harness/packages/bundle/web-app/cordis.patch.yml`). To make content search work, override it in your profile's `cordis.patch.yml` or an overlay:
+### ⏳ Lazy loading: the first search has to wait for the index
 
-```yaml
-- id: session-query-sqlite
-  config:
-    path: ':memory:'               # or a durable absolute path (survives restarts)
-    openAt: first-search           # or startup
-```
+Historical-session content search is **lazy-indexed** — with `openAt: first-search`, the index starts building only at the **first content search**; each search then does an **incremental reconcile** (only changed sessions are rebuilt).
 
-Then restart DSH web. If you do not enable it, the plugin's content mode shows setup guidance; title mode is unaffected.
+- On a large corpus the **first** content search is noticeably slower and may briefly return partial/no results — the background index is still building; wait a moment and search again to get correct hits.
+- Once built, subsequent searches are fast; unchanged data is not rebuilt.
+
+So if you cannot find historical content right after enabling it, **wait for the index to finish building before searching again** — it is not a malfunction.
 
 ## Installation
 
 ```sh
-# Option 1: install directly from GitHub (recommended) — lib/ is committed, no local build
-dsh plugin --profile web add github:drscrewdriver/dsh-switch-search#release-v0.1.0   # stable
-dsh plugin --profile web add github:drscrewdriver/dsh-switch-search#master          # baseline
-dsh plugin --profile web add github:drscrewdriver/dsh-switch-search#feat/type-filter-search  # latest dev
+# Option 1: install from npm (recommended)
+#   (the profile is a pnpm workspace root, so `add` needs the -w flag)
+dsh plugin --profile web add dsh-session-search-toggle -w
 
-# Option 2: assemble from a local path / source (see Development)
+# Option 2: assemble from git or a local path
+# dsh plugin --profile web add github:drscrewdriver/dsh-session-search-toggle#release-v0.1.0   # stable
+# dsh plugin --profile web add /absolute/path/to/dsh-session-search-toggle -w
+#    (after a git install, build in place inside the profile's node_modules: npm install --legacy-peer-deps && npm run build)
+
+# Confirm the compose tree contains the new line
+dsh web --dump-config | grep -B1 -A2 'session-search-toggle'
 
 # Restart dsh web — required! A running instance does not hot-load the bundle layer
 dsh web
 # or use the bundled script
-bash ~/.dsh/profiles/web/node_modules/dsh-switch-search/restart-dsh-web.sh
+bash ~/.dsh/profiles/web/node_modules/dsh-session-search-toggle/restart-dsh-web.sh
 ```
 
-After install a **"Search"** button appears at the sidebar footer; Settings → General gains the **"Session Search"** settings row.
+After install a **"Search"** button appears at the sidebar footer; click it to toggle between title and content search over historical sessions.
 
 ## Development
 
@@ -101,14 +101,13 @@ pnpm build              # tsc (lib/types) + tsdown (lib/index.mjs + lib/client.j
 
 ```
 src/
-├── index.ts            # host half (node): Config schema + installSettingsSection + routes
-├── config.ts           # pure shared config (enabled/defaultMode + namespace constant, schemastery-free for client)
+├── index.ts            # host half (node): /session-search-toggle/api route
 └── client/
-    └── index.ts        # browser half: sidebar.footer.action entry + floating panel + settings.general.item row
+    └── index.ts        # browser half: sidebar.footer.action entry + floating panel (title/content toggle)
 ```
 
-- **Host half**: registers the fenced HTTP route `/switch-search/api` (`list-sessions` / `content-search` / `search-status`), with a browser-trust fence identical to the DSH `/api` gateway (loopback Host or trustedHosts; cross-site refused).
-- **Config pattern**: modeled on dsh-thinking-levels — the host registers the `switch-search` namespace through the `settings` service with a schemastery `Config`; the client mirrors/edits it with `defineStore` + `settingsScope.bind`; the shared pure module `src/config.ts` keeps schemastery out of the client bundle.
+- **Host half**: registers the fenced HTTP route `/session-search-toggle/api` (`list-sessions` / `content-search`), with a browser-trust fence identical to the DSH `/api` gateway (loopback Host or trustedHosts; cross-site refused).
+- **Reuses the official search, no derived database**: like dsh-history, reads the live-preferred corpus through the built-in `sessionQuery` service — no official source changes, no derived database.
 - **Build chain**: tsdown mirrors the harness `packages/client/tsdown.client.ts` semantics (`__ModuleLoader__.load` banner, platform externals table, bundle purity gate).
 - **lib/ committed**: GitHub installs run off the committed build output (dsh does not run `prepare` on a git install); `.gitignore` does not exclude `lib/`.
 
@@ -117,18 +116,20 @@ src/
 | Branch | Purpose |
 |---|---|
 | `master` | Stable baseline (title ↔ content toggle, session grouping) |
-| `feat/type-filter-search` | Development (content-type filter + settings index entry + availability probe) |
+| `feat/type-filter-search` | Development (content-type filter + availability probe) |
 | `release-v0.1.0` | Stable installable version derived from the validated dev state, ships `lib/` |
+
+> This project was formerly named `dsh-switch-search` and is now published as `dsh-session-search-toggle` (npm package name and plugin name updated in sync). The old name is historical only — install with the new name.
 
 ## Relation to the official sidebar search
 
 - The official sidebar search box lives in `sidebar.workspaces` (a single slot); an external plugin **cannot replace it**. This plugin adds a **separate entry** at the sidebar footer via `sidebar.footer.action`; the two coexist.
-- The official content search hard-codes `user/message` + `assistant/message` in apiproxy; this plugin relaxes the filter through a `types` parameter to include `tool/call` + `tool/result`, enabling tool-level search.
+- This plugin only adds **an extra content-search path beside title search** — turning "which session said this" from digging into a one-keyword search.
 
 ## Compatibility and privacy
 
 - Requires DeepSeek Harness with the web profile; all data goes through the built-in `sessionQuery` service (live-preferred corpus) — **no official source changes, no derived database**.
-- Configuration lives only in the DSH settings namespace and browser panel state; it reads/upload nothing beyond session-search data.
+- The panel's current mode (title/content) and input live only in the browser session's memory; nothing beyond session-search data is read or uploaded.
 - Host/client contract types are declared structurally in `src/*.ts` (the npm dsh client chain is incomplete) and mirror the harness sources at build-verification time.
 
 ## License

@@ -1,5 +1,5 @@
 /**
- * dsh-switch-search client half: a `sidebar.footer.action` entry that opens a
+ * dsh-session-search-toggle client half: a `sidebar.footer.action` entry that opens a
  * floating search panel over the sidebar. The panel has two modes:
  *
  * - 标题搜索 — lists every session (title + cwd) from the host route and

@@ -1,5 +1,5 @@
 /**
- * dsh-switch-search host half: one fenced HTTP route `/switch-search/api`
+ * dsh-session-search-toggle host half: one fenced HTTP route `/session-search-toggle/api`
  * that drives the sidebar search panel's two modes:
  *
  * - `list-sessions` — the title-search corpus: every session id + folded
@@ -95,11 +95,11 @@ declare module 'cordis' {
     }
 }
 /** Stable plugin name for the cordis row. */
-export declare const name = "dsh-switch-search";
+export declare const name = "dsh-session-search-toggle";
 /** Services required before mounting: the web server routes and the trust list. */
 export declare const inject: string[];
 /**
- * Plugin body: mount the fenced /switch-search/api route.
+ * Plugin body: mount the fenced /session-search-toggle/api route.
  * @param ctx - host plugin context (webServer, webRuntime).
  */
 export declare function apply(ctx: Context): void;

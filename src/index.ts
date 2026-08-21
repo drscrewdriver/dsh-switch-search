@@ -1,5 +1,5 @@
 /**
- * dsh-switch-search host half: one fenced HTTP route `/switch-search/api`
+ * dsh-session-search-toggle host half: one fenced HTTP route `/session-search-toggle/api`
  * that drives the sidebar search panel's two modes:
  *
  * - `list-sessions` — the title-search corpus: every session id + folded
@@ -101,7 +101,7 @@ declare module 'cordis' {
 }
 
 /** Stable plugin name for the cordis row. */
-export const name = 'dsh-switch-search'
+export const name = 'dsh-session-search-toggle'
 
 /** Services required before mounting: the web server routes and the trust list. */
 export const inject = ['webServer', 'webRuntime']
@@ -269,13 +269,13 @@ async function contentSearch(
 }
 
 /**
- * Plugin body: mount the fenced /switch-search/api route.
+ * Plugin body: mount the fenced /session-search-toggle/api route.
  * @param ctx - host plugin context (webServer, webRuntime).
  */
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
-    path: '/switch-search/api',
+    path: '/session-search-toggle/api',
     handler: async (req, res) => {
       if (!isTrustedApiRequest(req, ctx.webRuntime.trustedHosts)) {
         writeJson(res, 403, { ok: false, error: 'forbidden' })
@@ -286,11 +286,11 @@ export function apply(ctx: Context): void {
         return
       }
       const pathname = new URL(req.url ?? '/', 'http://dsh.internal').pathname
-      const method = pathname.startsWith('/switch-search/api/')
-        ? pathname.slice('/switch-search/api/'.length)
+      const method = pathname.startsWith('/session-search-toggle/api/')
+        ? pathname.slice('/session-search-toggle/api/'.length)
         : undefined
       if (method === undefined || method.includes('/')) {
-        writeJson(res, 404, { ok: false, error: 'unknown switch-search API method' })
+        writeJson(res, 404, { ok: false, error: 'unknown session-search-toggle API method' })
         return
       }
       try {
@@ -299,7 +299,7 @@ export function apply(ctx: Context): void {
         if (method === 'list-sessions') result = await listSessions(ctx)
         else if (method === 'content-search') result = await contentSearch(ctx, payload)
         else {
-          writeJson(res, 404, { ok: false, error: `unknown switch-search API method "${method}"` })
+          writeJson(res, 404, { ok: false, error: `unknown session-search-toggle API method "${method}"` })
           return
         }
         writeJson(res, result.ok ? 200 : 400, result)
@@ -307,5 +307,5 @@ export function apply(ctx: Context): void {
         writeJson(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) })
       }
     },
-  }), 'dsh-switch-search: /switch-search/api route')
+  }), 'dsh-session-search-toggle: /session-search-toggle/api route')
 }
